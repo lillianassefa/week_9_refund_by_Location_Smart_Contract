@@ -1,7 +1,64 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
-import 'package:location/location.dart';
 import 'package:web3dart/web3dart.dart';
+
+class ContractClient {
+  late Web3Client ethClient;
+  String rpcUrl = "http://127.0.0.1:8545";
+
+  ContractClient() {
+    ethClient = Web3Client(
+      rpcUrl,
+      Client(),
+    );
+  }
+
+  Position? _currentPosition;
+  Future<DeployedContract> loadContract() async {
+    String abi = await rootBundle.loadString(
+        "artifacts/contracts/Geolocation.sol/RefundGeolocation.json");
+    String finalAbi = jsonDecode(abi)["abi"].toString();
+    const String contractAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
+    final contract = DeployedContract(
+      ContractAbi.fromJson(finalAbi, "RefundGeolocation"),
+      EthereumAddress.fromHex(contractAddress),
+    );
+    return contract;
+  }
+
+  Future<bool> sendCoordinates() async {
+    String privateKey =
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    EthPrivateKey credentials = EthPrivateKey.fromHex(privateKey);
+    final deployedContract = await loadContract();
+
+    final function = deployedContract.function('sendCoordinates');
+    List<dynamic> params = [
+      _currentPosition?.latitude.toDouble(),
+      _currentPosition?.longitude.toDouble(),
+    ];
+    if (_currentPosition == null) {
+      return false;
+    }
+    try {
+      await ethClient.sendTransaction(
+        credentials,
+        Transaction.callContract(
+          contract: deployedContract,
+          function: function,
+          parameters: params,
+        ),
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+}
 
 void main() {
   runApp(const MyApp());
@@ -15,7 +72,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "GEOLOGIX - REFUND BY GPS",
       theme: ThemeData(primarySwatch: Colors.blueGrey),
-      home: GpsPage(),
+      home: const GpsPage(),
     );
   }
 }
@@ -28,183 +85,73 @@ class GpsPage extends StatefulWidget {
 }
 
 class _GpsPageState extends State<GpsPage> {
-  Location location = Location();
-  double? latitude = 0.0;
-  double? longitude = 0.0;
+  String? _currentAddress;
+  Position? _currentPosition;
+  final contractClient = ContractClient();
 
-  Future<void> _getCurrentLocaion() async {
-    try {
-      LocationData currentLocation = await location.getLocation();
-      setState(() {
-        latitude = currentLocation.latitude;
-        longitude = currentLocation.longitude;
-      });
-    } catch (e) {
-      print('Failed to get Location,$e');
+  Future<bool> _locationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Location services are disabled. Please enable the services'),
+        ),
+      );
+      return false;
     }
+    permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permissions are denied'),
+          ),
+        );
+        return false;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Location permissions are permanently denied, we cannot request permissions.'),
+        ),
+      );
+      return false;
+    }
+    return true;
   }
 
-  // Future<void> _sendCoordinates() async {
-  //   final client = Web3Client(
-  //     'https://sepolia.infura.io/v3/378ceb8f39444456acb28987f3d881c9',
-  //     Client(),
-  //   );
+  Future<void> _getCurrentPosition() async {
+    final hasPermission = await _locationPermission();
+    if (!hasPermission) return;
+    await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    ).then((Position position) {
+      setState(() => _currentPosition = position);
+    }).catchError((e) {
+      debugPrint(e);
+    });
+  }
 
-  Future<void> _sendCoordinates() async {
-    final client = Web3Client(
-      'http://localhost:8545',
-      Client(),
-    );
-
-    Credentials credentials = EthPrivateKey.fromHex('Private key');
-
-    EthereumAddress contractAddress =
-        EthereumAddress.fromHex('0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0');
-
-    // final List<Map<String, dynamic>> abi = [
-    //   {
-    //     "inputs": [
-    //       {"internalType": "uint256", "name": "_latitude", "type": "uint256"},
-    //       {"internalType": "uint256", "name": "_longtiude", "type": "uint256"},
-    //       {"internalType": "uint256", "name": "_range", "type": "uint256"}
-    //     ],
-    //     "stateMutability": "nonpayable",
-    //     "type": "constructor"
-    //   },
-    //   {
-    //     "anonymous": false,
-    //     "inputs": [
-    //       {
-    //         "indexed": true,
-    //         "internalType": "address",
-    //         "name": "device",
-    //         "type": "address"
-    //       },
-    //       {
-    //         "indexed": false,
-    //         "internalType": "bool",
-    //         "name": "isWithinZone",
-    //         "type": "bool"
-    //       }
-    //     ],
-    //     "name": "ComplianceChecked",
-    //     "type": "event"
-    //   },
-    //   {
-    //     "anonymous": false,
-    //     "inputs": [
-    //       {
-    //         "indexed": true,
-    //         "internalType": "address",
-    //         "name": "device",
-    //         "type": "address"
-    //       },
-    //       {
-    //         "indexed": false,
-    //         "internalType": "uint256",
-    //         "name": "amount",
-    //         "type": "uint256"
-    //       }
-    //     ],
-    //     "name": "RefundProcessed",
-    //     "type": "event"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "avaialableFunds",
-    //     "outputs": [
-    //       {"internalType": "uint256", "name": "", "type": "uint256"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "company",
-    //     "outputs": [
-    //       {"internalType": "address", "name": "", "type": "address"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "device",
-    //     "outputs": [
-    //       {"internalType": "address", "name": "", "type": "address"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "isWithinZone",
-    //     "outputs": [
-    //       {"internalType": "bool", "name": "", "type": "bool"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "latitude",
-    //     "outputs": [
-    //       {"internalType": "uint256", "name": "", "type": "uint256"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "longitude",
-    //     "outputs": [
-    //       {"internalType": "uint256", "name": "", "type": "uint256"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [],
-    //     "name": "range",
-    //     "outputs": [
-    //       {"internalType": "uint256", "name": "", "type": "uint256"}
-    //     ],
-    //     "stateMutability": "view",
-    //     "type": "function"
-    //   },
-    //   {
-    //     "inputs": [
-    //       {"internalType": "uint256", "name": "_latitude", "type": "uint256"},
-    //       {"internalType": "uint256", "name": "_longitude", "type": "uint256"}
-    //     ],
-    //     "name": "sendCoordinates",
-    //     "outputs": [],
-    //     "stateMutability": "nonpayable",
-    //     "type": "function"
-    //   }
-    // ];
-
-    String jsonData =
-        '[{"inputs":[{"internalType":"uint256","name":"_latitude","type":"uint256"},{"internalType":"uint256","name":"_longtiude","type":"uint256"},{"internalType":"uint256","name":"_range","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"device","type":"address"},{"indexed":false,"internalType":"bool","name":"isWithinZone","type":"bool"}],"name":"ComplianceChecked","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"device","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"RefundProcessed","type":"event"},{"inputs":[],"name":"avaialableFunds","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"company","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"device","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"isWithinZone","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"latitude","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"longitude","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"range","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"_latitude","type":"uint256"},{"internalType":"uint256","name":"_longitude","type":"uint256"}],"name":"sendCoordinates","outputs":[],"stateMutability":"nonpayable","type":"function"}]';
-
-    // List<ContractFunction> abi =  ContractAbi.fromJson(jsonData, 'Geolocation').functions;
-
-    final contract = DeployedContract(
-        ContractAbi.fromJson(jsonData, 'Geolocation'), contractAddress);
-    final function = contract.function('sendCoordinates');
-    List<dynamic> params = [
-      latitude?.toDouble(),
-      longitude?.toDouble(),
-    ];
-
-    await client.sendTransaction(
-      credentials,
-      Transaction.callContract(
-        contract: contract,
-        function: function,
-        parameters: params,
-      ),
-    );
+  Future<void> _getAddressFromLatLng(Position position) async {
+    await placemarkFromCoordinates(
+            _currentPosition!.latitude, _currentPosition!.longitude)
+        .then((List<Placemark> placemarks) {
+      Placemark place = placemarks[0];
+      setState(() {
+        _currentAddress =
+            '${place.street}, ${place.subLocality},${place.subAdministrativeArea}, ${place.postalCode}';
+      });
+    }).catchError((e) {
+      debugPrint(e);
+    });
   }
 
   Widget build(BuildContext context) {
@@ -215,19 +162,44 @@ class _GpsPageState extends State<GpsPage> {
       body: Center(
           child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
+        children: [
           Text(
-            'Latitude: $latitude',
+            'Latitude: ${_currentPosition?.latitude ?? ""}',
           ),
           Text(
-            'Longitude: $longitude',
+            'Longitude: ${_currentPosition?.longitude ?? ""}',
           ),
           ElevatedButton(
-            onPressed: _getCurrentLocaion,
+            onPressed: _getCurrentPosition,
             child: const Text('Get my current location'),
           ),
           ElevatedButton(
-            onPressed: _sendCoordinates,
+            onPressed: () async {
+              contractClient.sendCoordinates().then((success) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Coordinates sent successfully!'),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Failed to send coordinates. Please try again.'),
+                    ),
+                  );
+                }
+              }).catchError(
+                (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                    ),
+                  );
+                },
+              );
+            },
             child: const Text('Send My Coordinates'),
           ),
         ],
