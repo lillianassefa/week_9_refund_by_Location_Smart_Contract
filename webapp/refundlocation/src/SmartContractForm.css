@@ -1,0 +1,23 @@
+.smart-contract-form {
+    margin-bottom: 20px;
+  }
+  
+  .smart-contract-form input {
+    margin-right: 10px;
+    border: 1px solid #90a4ae; 
+    padding: 8px;
+  }
+  
+  .smart-contract-form button {
+    margin-top: 10px;
+    background-color: #607d8b; 
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  
+  .smart-contract-form button:hover {
+    background-color: #455a64; 
+  }
+  

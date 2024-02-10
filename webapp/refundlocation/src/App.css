@@ -1,0 +1,23 @@
+.App {
+  text-align: center;
+  margin-top: 50px;
+}
+
+h1 {
+  margin-bottom: 20px;
+  color: #37474f; /* Blue-grey 900 */
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid #90a4ae; /* Blue-grey 300 */
+  padding: 8px;
+}
+
+th {
+  background-color: #cfd8dc; /* Blue-grey 200 */
+}

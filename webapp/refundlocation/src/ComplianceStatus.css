@@ -1,0 +1,17 @@
+.compliance-status {
+    margin-top: 20px;
+  }
+  
+  .compliance-status table {
+    margin-top: 10px;
+  }
+  
+  .compliance-status th, .compliance-status td {
+    border: 1px solid #90a4ae; 
+    padding: 8px;
+  }
+  
+  .compliance-status th {
+    background-color: #cfd8dc; 
+  }
+  

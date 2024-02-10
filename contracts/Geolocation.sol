@@ -45,4 +45,16 @@ contract RefundGeolocation {
         uint longDiff = longitude > _longitutde ? longitude -_longitutde : _longitutde - longitude;
         return (latDiff <= range && longDiff <= range);
     }
+    function addFunds() external payable onlyCreator {
+       avaialableFunds += msg.value;
+
+    }
+    function withdrawFunds(address payable _recipient, uint _amount) external onlyCreator {
+        require(_amount <= avaialableFunds, "Insufficient funds");
+        avaialableFunds-= _amount;
+        _recipient.transfer(_amount);
+    }
+    function getContractBalance() external view returns (uint) {
+        return address(this).balance;
+    }
 }

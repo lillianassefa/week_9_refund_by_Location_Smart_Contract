@@ -1,0 +1,23 @@
+.device-form {
+    margin-bottom: 20px;
+  }
+  
+  .device-form input {
+    margin-right: 10px;
+    border: 1px solid #90a4ae; 
+    padding: 8px;
+  }
+  
+  .device-form button {
+    margin-top: 10px;
+    background-color: #607d8b;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  
+  .device-form button:hover {
+    background-color: #455a64; 
+  }
+  
