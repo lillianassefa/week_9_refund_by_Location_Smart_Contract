@@ -4,11 +4,11 @@ const SmartContractForm = ({ contract }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
 
   const handleWithdrawFunds = async () => {
-    try {
-      await contract.methods.withdrawFunds(window.ethereum.selectedAddress, withdrawAmount).send({ from: window.ethereum.selectedAddress });
-    } catch (error) {
-      console.error(error);
-    }
+    // try {
+    //   await contract.methods.withdrawFunds(window.ethereum.selectedAddress, withdrawAmount).send({ from: window.ethereum.selectedAddress });
+    // } catch (error) {
+    //   console.error(error);
+    // }
   };
 
   return (

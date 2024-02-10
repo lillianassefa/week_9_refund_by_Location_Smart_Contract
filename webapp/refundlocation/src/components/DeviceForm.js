@@ -5,13 +5,11 @@ const DeviceForm = ({ onDeviceAdded }) => {
   const [timeLimit, setTimeLimit] = useState('');
   const [gpsReadingRange, setGpsReadingRange] = useState('');
 
-  const handleAddDevice = async () => {
-    try{
-      await onDeviceAdded({ address: deviceAddress, timeLimit: timeLimit, gpsReadingRange: gpsReadingRange});
-    }
-    catch(e){
-      console.error(e);
-    }
+  const handleAddDevice = () => {
+    onDeviceAdded({ deviceAddress, timeLimit, gpsReadingRange });
+    setDeviceAddress('');
+    setTimeLimit('');
+    setGpsReadingRange('');
   };
 
   return (
